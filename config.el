@@ -1,3 +1,4 @@
+;;; $DOOMDIR/config.el -*- lexical-binding: t; -*-
 (add-to-list 'default-frame-alist '(fullscreen . maximized))
 
 ;(setq display-line-numbers-type t)
@@ -6,10 +7,20 @@
 (setq user-full-name ""
       user-mail-address "")
 
-;; (defadvice text-scale-increase (around all-buffers (arg) activate)
-;;   (dolist (buffer (buffer-list))
-;;     (with-current-buffer buffer
-;;       ad-do-it)))
+(map! (:leader
+       (:prefix "b"
+        :desc  "tangle buffer"         :nv "t" #'org-babel-tangle)))
+
+(map! (:leader
+       (:prefix ("d" . "doom")
+        :desc   "reload doom"           :nv "r" #'doom/reload)))
+
+(setq server-socket-dir "~/.emacs.d/server/server")
+(require 'server)
+;; Start a server if (server-running-p) does not return t (e.g. if it
+;; returns nil or :other)
+(or (eq (server-running-p) t)
+    (server-start))
 
 ;; Doom exposes five (optional) variables for controlling fonts in Doom. Here
 ;; are the three important one:
@@ -43,7 +54,69 @@
 )))
 
 (map! (:map evil-normal-state-map
-       "C-c a" #'org-agenda))
+       "C-c a" #'org-agenda
+       "C-c o" (lambda () (interactive)(find-file "~/org/org.org"))
+       "C-c j" #'org-journal-open-current-journal-file))
+
+(after! org
+  (setq org-todo-keywords
+        '((sequence
+           "TODO(t)"  ; A task that needs doing & is ready to do
+           "PROJ(p)"  ; A project, which usually contains other tasks
+           "STRT(s!)"  ; A task that is in progress
+           "WAIT(w@/!)"  ; Something external is holding up this task
+           "HOLD(h@/!)"  ; This task is paused/on hold because of me
+           "|"
+           "DONE(d!)"  ; Task successfully completed
+           "KILL(k@)") ; Task was cancelled, aborted or is no longer applicable
+          (sequence
+           "[ ](T)"   ; A task that needs doing
+           "[-](S)"   ; Task is in progress
+           "[?](W)"   ; Task is being held up or paused
+           "|"
+           "[X](D)"))); Task was completed
+  (setq org-capture-templates
+        '(("t" "Todo" entry (file+headline "~/org/org.org" "Todo")
+           "* TODO %?\n %U")
+          ("r" "SN Request" entry (file+headline "~/org/org.org" "ServiceNow")
+           "* TODO %?\n %U\n [[][ServiceNow]]")
+          ("a" "Scrum" entry (file+headline "~/org/org.org" "Scrum")
+           "* TODO %?\n %U")
+          ("s" "Story Task" entry (file+headline "~/org/org.org" "Stories")
+           "* TODO %?\n %U\n [[][Jira]]")
+          ("i" "Inbox" entry (file+headline "~/org/org.org" "Inbox")
+           "* TODO %?\n %U")
+          ))
+  ;; https://blog.aaronbieber.com/2016/09/24/an-agenda-for-life-with-org-mode.html
+  (setq org-agenda-custom-commands
+        '(
+          ("v" "scrum" tags-todo "scrum+TODO=\"TODO\"")
+          ("c" "Simple agenda view"
+           ((agenda "")
+            (alltodo "")))
+          ))
+  )
+
+(setq org-log-into-drawer 't)
+
+(setq org-tag-alist '((:startgrouptag)
+                      ("campus")
+                      (:grouptags)
+                      ("barcode_ui")
+                      ("barcode_services")
+                      (:endgrouptag)
+                      ("scrum")
+                      ("serviceNow")
+                      ("stories")
+                      ("GIDB")))
+
+(setq org-journal-file-type 'weekly)
+
+(add-hook 'typescript-mode 'display-fill-column-indicator-mode)
+
+(map! (:leader
+       (:prefix "g"
+        :desc   "magit diff"            :nv "d" #'magit-diff)))
 
 (projectile-add-known-project "C:/Users/vincli/AppData/Roaming/org")
 (projectile-add-known-project "C:/Users/vincli/AppData/Roaming/.doom.d")
@@ -85,8 +158,8 @@
       (:map evil-normal-state-map
        "C-S-f" #'+ivy/project-search))
 
+
+
 ;; Enabling Company defaults
 (setq company-idle-delay 0.1
       company-minimum-prefix-length 2)
-
-;(default-text-scale-mode 't)

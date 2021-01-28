@@ -1,44 +1,59 @@
 #+TITLE: Doom Literate Config
 #+STARTUP: overview
-Place your private configuration here! Remember, you do not need to run 'doom
-sync' after modifying this file!
+#+PROPERTY: header-args :tangle config.el
+Place your private configuration here! Remember, you need to run org-babel-tangle =SPC b t=
+and then 'doom sync' after modifying this file!
 
-Just some lisp code to kill emacs
-(save-buffers-kill-emacs)
 * General
 Emacs start in fullscreen mode
 
-#+BEGIN_SRC emacs-lisp
+#+BEGIN_SRC elisp
+;;; $DOOMDIR/config.el -*- lexical-binding: t; -*-
 (add-to-list 'default-frame-alist '(fullscreen . maximized))
 #+END_SRC
 
 This determines the style of line numbers in effect. If set to `nil', line
 numbers are disabled. For relative line numbers, set this to `relative'.
-#+BEGIN_SRC emacs-lisp
+#+BEGIN_SRC elisp
 ;(setq display-line-numbers-type t)
 (setq display-line-numbers-type 'nil)
 #+END_SRC
-
 
 Who am I?
 
 Some functionality uses this to identify you, e.g. GPG configuration, email
 clients, file templates and snippets.
-#+BEGIN_SRC emacs-lisp
+#+BEGIN_SRC elisp
 (setq user-full-name ""
       user-mail-address "")
 #+END_SRC
 
-Global zoom that works accross all buffers. By default it only works per buffer.
-#+BEGIN_SRC emacs-lisp
-;; (defadvice text-scale-increase (around all-buffers (arg) activate)
-;;   (dolist (buffer (buffer-list))
-;;     (with-current-buffer buffer
-;;       ad-do-it)))
+Doom mode literate config seems to be broken for me, so have this bound for easy
+access to manually tangle to config.org
+#+BEGIN_SRC elisp
+(map! (:leader
+       (:prefix "b"
+        :desc  "tangle buffer"         :nv "t" #'org-babel-tangle)))
+#+END_SRC
+
+Adding Doom reload to mapping so I don't have to keep on typing M-x
+#+BEGIN_SRC elisp
+(map! (:leader
+       (:prefix ("d" . "doom")
+        :desc   "reload doom"           :nv "r" #'doom/reload)))
+#+END_SRC
+Attempting to Fix emacs daemon, not sure why it's not working
+#+BEGIN_SRC elisp
+(setq server-socket-dir "~/.emacs.d/server/server")
+(require 'server)
+;; Start a server if (server-running-p) does not return t (e.g. if it
+;; returns nil or :other)
+(or (eq (server-running-p) t)
+    (server-start))
 #+END_SRC
 
 ** Themes
-#+BEGIN_SRC emacs-lisp
+#+BEGIN_SRC elisp
 ;; Doom exposes five (optional) variables for controlling fonts in Doom. Here
 ;; are the three important one:
 ;;
@@ -63,7 +78,7 @@ Global zoom that works accross all buffers. By default it only works per buffer.
 #+END_SRC
 * Org
 The amazing organizer mode, this is just some general configs
-#+BEGIN_SRC emacs-lisp
+#+BEGIN_SRC elisp
 (setq org-directory "~/org/")
 ;; For org linking
 (setq org-id-link-to-org-use-id 'create-if-interactive-and-no-custom-id)
@@ -74,14 +89,96 @@ The amazing organizer mode, this is just some general configs
 )))
 
 (map! (:map evil-normal-state-map
-       "C-c a" #'org-agenda))
+       "C-c a" #'org-agenda
+       "C-c o" (lambda () (interactive)(find-file "~/org/org.org"))
+       "C-c j" #'org-journal-open-current-journal-file))
+
 #+END_SRC
 
+This sets the todo keywords. Copied from org mode module. Modified to include logging
+/ explanations for certain states (explained [[https://orgmode.org/manual/Tracking-TODO-state-changes.html][here]])
+#+BEGIN_SRC elisp
+(after! org
+  (setq org-todo-keywords
+        '((sequence
+           "TODO(t)"  ; A task that needs doing & is ready to do
+           "PROJ(p)"  ; A project, which usually contains other tasks
+           "STRT(s!)"  ; A task that is in progress
+           "WAIT(w@/!)"  ; Something external is holding up this task
+           "HOLD(h@/!)"  ; This task is paused/on hold because of me
+           "|"
+           "DONE(d!)"  ; Task successfully completed
+           "KILL(k@)") ; Task was cancelled, aborted or is no longer applicable
+          (sequence
+           "[ ](T)"   ; A task that needs doing
+           "[-](S)"   ; Task is in progress
+           "[?](W)"   ; Task is being held up or paused
+           "|"
+           "[X](D)"))); Task was completed
+  (setq org-capture-templates
+        '(("t" "Todo" entry (file+headline "~/org/org.org" "Todo")
+           "* TODO %?\n %U")
+          ("r" "SN Request" entry (file+headline "~/org/org.org" "ServiceNow")
+           "* TODO %?\n %U\n [[][ServiceNow]]")
+          ("a" "Scrum" entry (file+headline "~/org/org.org" "Scrum")
+           "* TODO %?\n %U")
+          ("s" "Story Task" entry (file+headline "~/org/org.org" "Stories")
+           "* TODO %?\n %U\n [[][Jira]]")
+          ("i" "Inbox" entry (file+headline "~/org/org.org" "Inbox")
+           "* TODO %?\n %U")
+          ))
+  ;; https://blog.aaronbieber.com/2016/09/24/an-agenda-for-life-with-org-mode.html
+  (setq org-agenda-custom-commands
+        '(
+          ("v" "scrum" tags-todo "scrum+TODO=\"TODO\"")
+          ("c" "Simple agenda view"
+           ((agenda "")
+            (alltodo "")))
+          ))
+  )
+#+END_SRC
+
+Enable state change logging into a special drawer called `LOGBOOK`
+#+BEGIN_SRC elisp
+(setq org-log-into-drawer 't)
+#+END_SRC
+
+Setting up tag, creating a group tag so I don't need to always put the same two tags together...
+#+BEGIN_SRC elisp
+(setq org-tag-alist '((:startgrouptag)
+                      ("campus")
+                      (:grouptags)
+                      ("barcode_ui")
+                      ("barcode_services")
+                      (:endgrouptag)
+                      ("scrum")
+                      ("serviceNow")
+                      ("stories")
+                      ("GIDB")))
+#+END_SRC
+** Journal
+setup for org journal, changing the file type to weekly
+#+BEGIN_SRC elisp
+(setq org-journal-file-type 'weekly)
+#+END_SRC
+
+* Fill Column Indicator
+This is the 80 char column indicator, I only want it for ts files for now...
+#+BEGIN_SRC elisp
+(add-hook 'typescript-mode 'display-fill-column-indicator-mode)
+#+END_SRC
+* Magit
+Creating binding for easy access to magit diff
+#+BEGIN_SRC elisp
+(map! (:leader
+       (:prefix "g"
+        :desc   "magit diff"            :nv "d" #'magit-diff)))
+#+END_SRC
 * Projectile
 This adds projects to projectile. By default I added everything in my work
 directory as well as my org directory. Also removes.emacs.d cause all the
 configuration is done in .doom.d...
-#+BEGIN_SRC emacs-lisp
+#+BEGIN_SRC elisp
 (projectile-add-known-project "C:/Users/vincli/AppData/Roaming/org")
 (projectile-add-known-project "C:/Users/vincli/AppData/Roaming/.doom.d")
 ;; sometimes glitches out, run (projectile-discover-projects-in-search-path)
@@ -93,7 +190,7 @@ configuration is done in .doom.d...
 This prevents new workspaces from being opened up with every new emacsclient connection
 (when you use REmacs), rather it just creates a workspace main, if it already exists
 switches to it
-#+BEGIN_SRC emacs-lisp
+#+BEGIN_SRC elisp
 (after! persp-mode
   (setq persp-emacsclient-init-frame-behaviour-override "main"))
 #+END_SRC
@@ -101,7 +198,7 @@ switches to it
 This mapping allows for easy access to eshell, it also has a function
 for switching to the buffer/creating it if it's not in a currently visible
 frame
-#+BEGIN_SRC emacs-lisp
+#+BEGIN_SRC elisp
 (map! (:leader
        (:prefix "o"
         :desc   "Treemacs"              :nv "t" #'treemacs
@@ -124,7 +221,7 @@ frame
 * lsp
 Syntax highlighting, error checking, all the good stuff you want. This adds some
 simple bindings for some common lsp commands
-#+BEGIN_SRC emacs-lisp
+#+BEGIN_SRC elisp
 (map! (:leader
        (:prefix ("l" . "lsp")
         :desc   "Run lsp"               :nv "l" #'lsp
@@ -132,7 +229,7 @@ simple bindings for some common lsp commands
 #+END_SRC
 * Evil
 Vim keybindings! Just binding a few things to the evil mode map
-#+BEGIN_SRC emacs-lisp
+#+BEGIN_SRC elisp
 (map! ;; Maps C-w C-; to hydra window nav for easier window resizing
        (:map evil-window-map
        "C-;" #'+hydra/window-nav/body)
@@ -140,13 +237,18 @@ Vim keybindings! Just binding a few things to the evil mode map
       (:map evil-normal-state-map
        "C-S-f" #'+ivy/project-search))
 #+END_SRC
+** Evil dvorak
+Simple dvorak keybindings for evil mode
+#+BEGIN_SRC elisp
+
+#+END_SRC
 * Eyebrowse
 TODO, this isn't fully fleshed out yet... In essence it's a frame saver that can
 create tabs w/different frame layouts. Unfortunately it doesn't work well with
 projectile right now, there's some glue for it, but I haven't set it up yet, [[https://github.com/syl20bnr/spacemacs/pull/4068][here's]]
 some glue code for spacemacs that I can probably get to work... Probably
 
-#+BEGIN_QUOTE
+#+BEGIN_SRC elisp :tangle no
 (map! (:leader
       ;; Unbind browse things in magit-mode map to enable eyebrowse
       (:map magit-mode-map
@@ -159,13 +261,13 @@ some glue code for spacemacs that I can probably get to work... Probably
 
 ;; This unbinds it from doom/backward-to-bol-or-indent, giving it to eyebrowse
 (undefine-key! "C-a")
-#+END_QUOTE
+#+END_SRC
 
 * Company
 Auto completion framework that makes the auto complete options pop up at the bottom.
 By default the suggestions are disabled (by hlissner), this re-enables them with the
 Company defaults
-#+BEGIN_SRC emacs-lisp
+#+BEGIN_SRC elisp
 ;; Enabling Company defaults
 (setq company-idle-delay 0.1
       company-minimum-prefix-length 2)
@@ -173,10 +275,3 @@ Company defaults
 
 
 
-
-* Default Text Scaling
-This is to enable text scaling rather than just zoom. Enables zoom in everything,
-including modeline and stuff, I hope
-#+BEGIN_SRC emacs-lisp
-;(default-text-scale-mode 't)
-#+END_SRC
